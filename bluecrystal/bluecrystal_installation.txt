@@ -1,1 +1,88 @@
+module add tools/git/2.18.0
+module add languages/gcc-9.1.0
+
+
+#Create a directory called wholecell3(or whatever you want to call it)
+
+mkdir wholecell3
+cd wholecell3/
+
+git clone https://github.com/CovertLab/wcEcoli
+cd wholecell3/
+
+git clone https://github.com/pyenv/pyenv.git ~/.pyenv
+echo 'export PYENV_ROOT="$HOME/.pyenv"' >> ~/.bash_profile
+echo 'export PATH="$PYENV_ROOT/bin:$PATH"' >> ~/.bash_profile
+echo -e 'if command -v pyenv 1>/dev/null 2>&1; then\n eval "$(pyenv init -)"\nfi' >> ~/.bash_profile
+source ~/.bash_profile
+
+git clone https://github.com/pyenv/pyenv-virtualenv.git $(pyenv root)/plugins/pyenv-virtualenv
+echo 'eval "$(pyenv virtualenv-init -)"' >> ~/.bash_profile
+git clone https://github.com/pyenv/pyenv-virtualenvwrapper.git $(pyenv root)/plugins/pyenv-virtualenvwrapper
+source ~/.bash_profile
+
+PYTHON_CONFIGURE_OPTS="--enable-shared" pyenv install 3.8.5
+
+##If you get an error regarding openssl, follow the instructions here to install it 
+##locally under your username: https://help.dreamhost.com/hc/en-us/articles/360001435926-Installing-OpenSSL-locally-under-your-username
+
+#Then run the following, changing '/newhome/ig13470/openssl' to where your newly installed openssl is located
+
+CONFIGURE_OPTS="--with-openssl=/mnt/storage/home/ig13470/wholecell3/openssl/" PYTHON_CONFIGURE_OPTS="--enable-shared" pyenv install 3.8.5
+
+
+cd wcEcoli/
+pyenv local 3.8.5
+pyenv virtualenv wcEcoli3
+pyenv local wcEcoli3
+
+pip install --upgrade pip setuptools virtualenv virtualenvwrapper virtualenv-clone wheel
+
+cd ../
+
+git clone https://github.com/xianyi/OpenBLAS
+cd OpenBLAS
+git checkout v0.3.7
+
+#Set Environment:
+
+export FC=/cm/shared/languages/GCC-9.1.0/bin/gfortran
+export CC=/cm/shared/languages/GCC-9.1.0/bin/gcc
+FC=/cm/shared/languages/GCC-9.1.0/bin/gfortran make -j 8
+
+make PREFIX=/newhome/ig13470/wholecell3/install install ###change this for your own
+
+>>Create numpy-site.cfg:
+
+~/.numpy-site.cfg
+
+and include:
+
+[openblas]
+libraries = openblas
+library_dirs = /newhome/ig13470/wholecell3/install/lib
+include_dirs = /newhome/ig13470/wholecell3/install/include
+runtime_library_dirs = /newhome/ig13470/wholecell3/install/lib
+
+cd ../wcEcoli/
+
+##Install in this order##
+
+pip install scipy==1.5.4 --no-binary scipy==1.5.4 --force-reinstall
+pip install numpy==1.19.5 --no-binary numpy==1.19.5 --force-reinstall
+
+CPATH=/usr/include/glpk CVXOPT_BUILD_GLPK=1 pip install -r requirements.txt --no-binary cvxopt
+export PYTHONPATH="$PWD:$PYTHONPATH"
+
+make clean compile
+
+##Test:
+
+python runscripts/manual/runParca.py
+
+python runscripts/manual/runParca.py --cpus 8
+
+python runscripts/manual/runSim.py --variant "wildtype" 0 0 --generations 1 --init-sims 1
+
+
 
